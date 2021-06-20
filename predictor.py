@@ -1,4 +1,3 @@
-import warnings              as warn
 import collections           as coll
 import gzip                  as gzip
 import sklearn.linear_model  as line
@@ -6,19 +5,19 @@ import scipy.sparse          as spar
 import utilities             as util
 
 
-
 # parameters
-train_split  = 165000
 num_unigrams = 27000
-iterations   = 500
-reg_constant = 2.0
+reg_constant = 0.2
+iterations   = 400
+train_split  = 165000
+algorithm    = "newton-cg"  # liblinear, lbfgs, newton-cg, sag, saga
 train_file   = "train.json.gz"
 test_file    = "test.json.gz"
 
 
 # 1. load the training data
 print("1. Loading data")
-reviews_raw = [eval(line) for line in gzip.open(train_file, "r+")]
+reviews_raw = [eval(review) for review in gzip.open(train_file, "r+")]
 print("   Data loaded")
 
 # 2. build a list of all words in the training set and their counts, sorted by order
@@ -43,9 +42,6 @@ for i in range(len(reviews_raw)):
     for j in range(num_unigrams):
         if features[j] != 0:
             X[i, j] = features[j]
-# X = prep.minmax_scale(X, feature_range=(0, 1))
-# X = prep.scale(X, with_mean=False)
-# min_max_scaler = skle.preprocessing.MinMaxScaler()
 X_train = X[:train_split]
 y_train = y[:train_split]
 X_valid = X[train_split:]
@@ -54,11 +50,8 @@ print("   Sets built")
 
 # 5. train the model
 print("5. Training model")
-model = line.LogisticRegression(max_iter=iterations, n_jobs=-1, C=reg_constant)
-# warn.filterwarnings("ignore")  # otherwise fit() will throw ConvergenceWarning
-with warn.catch_warnings():  # otherwise fit() will throw ConvergenceWarning
-    warn.simplefilter("ignore")
-    model.fit(X_train, y_train)
+model = line.LogisticRegression(max_iter=iterations, n_jobs=-1, C=reg_constant, solver=algorithm)
+model.fit(X_train, y_train)
 print("   Model trained")
 
 # 6. get predictions and find the accuracy
