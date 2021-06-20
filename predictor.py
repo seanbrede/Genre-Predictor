@@ -1,102 +1,68 @@
-from collections      import defaultdict
-from sklearn          import linear_model
-from sklearn.ensemble import RandomForestClassifier
-from sklearn          import preprocessing
-from scipy.sparse     import lil_matrix
-import gzip
-import string
-import warnings
+import warnings              as warn
+import collections           as coll
+import gzip                  as gzip
+import sklearn.linear_model  as line
+import scipy.sparse          as spar
+import utilities             as util
 
 
-def load_data(path):
-    raw_data = [eval(line) for line in gzip.open(path, 'r+')]
-    return raw_data
 
-def calc_acc(ps, ys):
-    right, wrong = 0, 0
-    for p, y in zip(ps, ys):
-        if p == y: right += 1
-        else:      wrong += 1
-    return right / (right + wrong)
-
-def featurize(review, indexFromWord, dictSize):
-    features = [0] * dictSize
-    for word in review['text'].split():
-        word = ''.join([c for c in word.lower() if not c in set(string.punctuation)])
-        if indexFromWord[word] != -1:
-            features[indexFromWord[word]] += 1
-    #features.append(review['hours'])
-    #features.append(len(review['text']))
-    return features
+# parameters
+train_split  = 165000
+num_unigrams = 27000
+iterations   = 500
+reg_constant = 2.0
+train_file   = "train.json.gz"
+test_file    = "test.json.gz"
 
 
-# settings
-trainSplit = 165000
-dictSize   = 35000
-warnings.filterwarnings('ignore')
+# 1. load the training data
+print("1. Loading data")
+reviews_raw = [eval(line) for line in gzip.open(train_file, "r+")]
+print("   Data loaded")
 
-# load the data
-reviews = load_data('train_Category.json.gz')
+# 2. build a list of all words in the training set and their counts, sorted by order
+print("2. Counting words")
+word_to_count = util.countWords(reviews_raw, train_split)
+print("   Words counted")
 
-# build a list of all words in the training set and their counts, sorted by order
-punctuation = set(string.punctuation)
-wordCount = defaultdict(int)
-for review in reviews[:trainSplit]:  # only in the TRAINING set
-    for word in review['text'].split():
-        word = ''.join([c for c in word.lower() if not c in punctuation])
-        wordCount[word] += 1
-wordCount = [(k, v) for k, v in wordCount.items()]
-wordCount.sort(key=lambda kvp: kvp[1])
-wordCount.reverse()  # now we have the sorted list
+# 3. set up the dictionary of {word: feature_index}
+print("3. Establishing dictionary")
+word_to_index = coll.defaultdict(lambda: -1)
+for i in range(num_unigrams):
+    k, _ = word_to_count[i]
+    word_to_index[k] = i
+print("   Dictionary established")
 
-# set up the dictionary of {word: feature_index}
-wordIndexDict = defaultdict(lambda: -1)
-for i in range(dictSize):
-    k, _ = wordCount[i]
-    wordIndexDict[k] = i
-
-# build the training and validation sets
-numFeatures = dictSize
-y = [r['genreID'] for r in reviews]
-X = lil_matrix((len(reviews), numFeatures))
-for i in range(len(reviews)):
-    features = featurize(reviews[i], wordIndexDict, dictSize)
-    for j in range(numFeatures):
+# 4. build the training and validation sets
+print("4. Building sets")
+y = [r['genreID'] for r in reviews_raw]
+X = spar.lil_matrix((len(reviews_raw), num_unigrams))
+for i in range(len(reviews_raw)):
+    features = util.featurize(reviews_raw[i], word_to_index, num_unigrams)
+    for j in range(num_unigrams):
         if features[j] != 0:
-            X[i,j] = features[j]
-#X = preprocessing.scale(X, with_mean=False)
-X_train = X[:trainSplit]
-y_train = y[:trainSplit]
-X_valid = X[trainSplit:]
-y_valid = y[trainSplit:]
+            X[i, j] = features[j]
+# X = prep.minmax_scale(X, feature_range=(0, 1))
+# X = prep.scale(X, with_mean=False)
+# min_max_scaler = skle.preprocessing.MinMaxScaler()
+X_train = X[:train_split]
+y_train = y[:train_split]
+X_valid = X[train_split:]
+y_valid = y[train_split:]
+print("   Sets built")
 
-# train the model
-mod = linear_model.LogisticRegression(max_iter=15000, n_jobs=-1, C=2.0)
-mod.fit(X_train, y_train)
+# 5. train the model
+print("5. Training model")
+model = line.LogisticRegression(max_iter=iterations, n_jobs=-1, C=reg_constant)
+# warn.filterwarnings("ignore")  # otherwise fit() will throw ConvergenceWarning
+with warn.catch_warnings():  # otherwise fit() will throw ConvergenceWarning
+    warn.simplefilter("ignore")
+    model.fit(X_train, y_train)
+print("   Model trained")
 
-# get predictions and find the accuracy
-preds = mod.predict(X_valid)
-valid_acc = calc_acc(preds, y_valid)
-print("Validation accuracy =", valid_acc)
-
-# load the test set and build a table of {reviewid: review}
-reviews = load_data('test_Category.json.gz')
-idToReview = {}
-for review in reviews:
-    idToReview[review['reviewID']] = review
-
-# generate and write predictions for the test set
-predictions = open("predictions_Category.csv", 'w')
-for l in open("pairs_Category.txt"):
-    # header
-    if l.startswith("userID"):
-        predictions.write(l)
-        continue
-    u, r = l.strip().split('-')
-    review = idToReview[r]
-    features = featurize(review, wordIndexDict, dictSize)
-    p = mod.predict([features])[0]
-    predictions.write(u + '-' + r + "," + str(p) + "\n")
-predictions.close()
-
-print("predictions successfully generated in predictions_Category.csv")
+# 6. get predictions and find the accuracy
+print("6. Computing accuracy")
+preds = model.predict(X_valid)
+valid_acc = util.calcAcc(preds, y_valid)
+print("   Accuracy computed ->", valid_acc)
