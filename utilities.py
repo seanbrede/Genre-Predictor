@@ -6,13 +6,40 @@ import string
 def countWords(reviews_raw, train_split):
     punctuation = set(string.punctuation)
     word_counts = col.defaultdict(int)
+
     for review in reviews_raw[:train_split]:  # only in the TRAINING set
         for word in review["text"].split():
             word = "".join([c for c in word.lower() if c not in punctuation])
             word_counts[word] += 1
-    word_counts = [(k, v) for k, v in word_counts.items()]
+
+    word_counts = [(word, count) for word, count in word_counts.items()]
+    word_counts.sort(key=lambda x: x[1], reverse=True)
+    # we now have a list of words sorted by count
+    return word_counts
+
+
+# TODO
+def countGrams(reviews_raw, train_split, grams):
+    punctuation = set(string.punctuation)
+    # gram_counts = col.defaultdict(int)
+    gram_counts = []
+
+    for review in reviews_raw[:train_split]:  # only in the TRAINING set
+        review = review["text"].lower()
+        review = "".join([c for c in review if c not in punctuation])
+        review = review.split()
+
+        # for word in review["text"].split():
+        for i in range(len(review)):
+            for j in range(grams):
+                pass
+
+    # derp
+    word_counts = [(word, count) for word, count in word_counts.items()]
     word_counts.sort(key=lambda kvp: kvp[1])
-    word_counts.reverse()  # now we have the sorted list
+    word_counts.reverse()
+
+    # we now have a list of words sorted by count
     return word_counts
 
 
