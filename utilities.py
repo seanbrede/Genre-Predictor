@@ -18,27 +18,31 @@ def countWords(reviews_raw, train_split):
 
 
 # TODO
-def countGrams(reviews_raw, train_split, grams):
+def countTotalGrams(reviews_raw, train_split, grams):
     punctuation = set(stri.punctuation)
     gram_counts = [coll.defaultdict(int) for _ in range(grams)]
 
     for review in reviews_raw[:train_split]:
+        # lowercase, remove punctuation, and split into tokens
         review = review["text"].lower()
         review = "".join([c for c in review if c not in punctuation])
         review = review.split()
 
+        # count all grams in the review
         for i in range(len(review)):
-            for gram in range(grams):
-                if i + gram < len(review):
-                    entry = "".join([review[j] for j in range(i, i + gram + 1)])
-                    gram_counts[gram][entry] += 1
+            for g in range(grams):
+                if i + g < len(review):
+                    entry = "".join([review[j] for j in range(i, i + g + 1)])
+                    gram_counts[g][entry] += 1
 
-    # derp
-    word_counts = [(word, count) for word, count in gramlist for gramlist in gram_counts]
-    word_counts.sort(key=lambda x: x[1], reverse=True)
+    # put the grams into a list and sort by count
+    gram_counts_list = []
+    for i in range(grams):
+        gram_counts_entry = [(gram, count) for gram, count in gram_counts[i]]
+        gram_counts_entry.sort(key=lambda x: x[1], reverse=True)
 
-    # we now have a list of words sorted by count
-    return word_counts
+    # we now have a list of lists of n-grams, sorted by count
+    return gram_counts_list
 
 
 def featurize(review, word_to_index, dict_size):
