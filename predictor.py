@@ -1,14 +1,12 @@
-import collections           as coll
-import gzip                  as gzip
-import sklearn.linear_model  as line
-import scipy.sparse          as spar
-import utilities             as util
+import gzip                 as gzip
+import sklearn.linear_model as line
+import utilities            as util
 
 
 # parameters
-num_unigrams = 27000
-reg_constant = 0.2
-iterations   = 400
+grams        = 20000, 2000, 200
+reg_constant = 0.5
+iterations   = 500
 train_split  = 165000
 algorithm    = "newton-cg"  # liblinear, lbfgs, newton-cg, sag, saga
 train_file   = "train.json.gz"
@@ -17,31 +15,22 @@ test_file    = "test.json.gz"
 
 # 1. load the training data
 print("1. Loading data")
-reviews_raw = [eval(review) for review in gzip.open(train_file, "r+")]
+raw_reviews = [eval(review) for review in gzip.open(train_file, "r+")]
 print("   Data loaded")
 
 # 2. build a list of all words in the training set and their counts, sorted by order
-print("2. Counting words")
-word_counts = util.countWords(reviews_raw, train_split)
-print("   Words counted")
+print("2. Counting grams")
+gram_counts_list = util.countTotalGrams(raw_reviews[:train_split], len(grams))
+print("   Grams counted")
 
-# 3. set up the dictionary of {word: feature_index}
-print("3. Establishing dictionary")
-word_indices = coll.defaultdict(lambda: -1)
-for i in range(num_unigrams):
-    word, _ = word_counts[i]
-    word_indices[word] = i
-print("   Dictionary established")
+# 3. set up the list of dictionaries of {gram: feature_index}
+print("3. Building dictionary")
+gram_indices = util.buildIndices(gram_counts_list, grams)
+print("   Dictionary built")
 
 # 4. build the training and validation sets
 print("4. Building sets")
-y = [r['genreID'] for r in reviews_raw]
-X = spar.lil_matrix((len(reviews_raw), num_unigrams))
-for i in range(len(reviews_raw)):
-    features = util.featurize(reviews_raw[i], word_indices, num_unigrams)
-    for j in range(num_unigrams):
-        if features[j] != 0:
-            X[i, j] = features[j]
+X, y = util.buildSets(raw_reviews, grams, gram_indices)
 X_train = X[:train_split]
 y_train = y[:train_split]
 X_valid = X[train_split:]
@@ -50,12 +39,12 @@ print("   Sets built")
 
 # 5. train the model
 print("5. Training model")
-model = line.LogisticRegression(max_iter=iterations, n_jobs=-1, C=reg_constant, solver=algorithm)
+model = line.LogisticRegression(max_iter=iterations, C=reg_constant, solver=algorithm, n_jobs=-1)
 model.fit(X_train, y_train)
 print("   Model trained")
 
 # 6. get predictions and find the accuracy
 print("6. Computing accuracy")
 preds = model.predict(X_valid)
-valid_acc = util.calcAcc(preds, y_valid)
+valid_acc = util.calcAccuracy(preds, y_valid)
 print("   Accuracy computed ->", valid_acc)

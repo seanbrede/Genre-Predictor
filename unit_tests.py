@@ -4,7 +4,7 @@ import utilities as pu
 def test_countGrams():
     reviews_raw = [{"text": "Check this out."},
                    {"text": "Check this out, please."}]
-    result = pu.countTotalGrams(reviews_raw, 2, 3)
+    result = pu.countTotalGrams(reviews_raw, 3)
     print(result)
 
 
