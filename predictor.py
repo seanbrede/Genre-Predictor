@@ -4,9 +4,9 @@ import utilities            as util
 
 
 # parameters
-grams        = 20000, 2000, 200
+grams        = 20000, 6000, 1200
 reg_constant = 0.5
-iterations   = 500
+iterations   = 1000
 train_split  = 165000
 algorithm    = "newton-cg"  # liblinear, lbfgs, newton-cg, sag, saga
 train_file   = "train.json.gz"

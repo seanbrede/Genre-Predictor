@@ -6,14 +6,14 @@ import string       as stri
 punctuation = set(stri.punctuation)
 
 
-def processReview(raw_review):
+def processReview(raw_review: dict[str, any]) -> list[str]:
     review_text = raw_review["text"].lower()
     review_text = "".join([c for c in review_text if c not in punctuation])
     review_text = review_text.split()
     return review_text
 
 
-def countTotalGrams(raw_reviews, grams):
+def countTotalGrams(raw_reviews: list[dict[str, any]], grams: int) -> list[list[(str, int)]]:
     gram_counts = [coll.defaultdict(int) for _ in range(grams)]
 
     for raw_review in raw_reviews:
@@ -38,7 +38,7 @@ def countTotalGrams(raw_reviews, grams):
     return gram_counts_list
 
 
-def buildIndices(gram_counts_list, grams):
+def buildIndices(gram_counts_list: list[list[str, int]], grams) -> dict[str, int]:
     gram_indices = coll.defaultdict(lambda: -1)
     next_index   = 0
 
@@ -51,7 +51,7 @@ def buildIndices(gram_counts_list, grams):
     return gram_indices
 
 
-def extractFeatures(raw_review, grams_indices, nums_grams):
+def extractFeatures(raw_review: dict[str, any], grams_indices: dict[str, int], nums_grams: list[int]) -> list[int]:
     features = [0] * sum(nums_grams)
 
     # lowercase, remove punctuation, split
@@ -60,20 +60,21 @@ def extractFeatures(raw_review, grams_indices, nums_grams):
     for i in range(len(review)):
         for g in range(len(nums_grams)):
             if i + g < len(review):
-                entry = "".join([review[j] for j in range(i, i + g + 1)])
-                index = grams_indices[g][entry]
+                entry = "-".join([review[j] for j in range(i, i + g + 1)])
+                # index = grams_indices[g][entry]
+                index = grams_indices[entry]
                 features[index] += 1
 
     return features
 
 
 def buildSets(reviews_raw, nums_grams, grams_indices):
-    X = spar.lil_matrix((len(reviews_raw), nums_grams))  # TODO fix this, use sum(nums_grams)?
+    X = spar.lil_matrix((len(reviews_raw), sum(nums_grams)))  # TODO fix this, use sum(nums_grams)?
     Y = [r['genreID'] for r in reviews_raw]
 
     for i in range(len(reviews_raw)):
         features = extractFeatures(reviews_raw[i], grams_indices, nums_grams)
-        for j in range(nums_grams):
+        for j in range(sum(nums_grams)):
             if features[j] != 0:
                 X[i, j] = features[j]
 
